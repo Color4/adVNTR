@@ -24,6 +24,38 @@ def print_error(subparser, msg):
     sys.exit("\nERROR: %s" % msg)
 
 
+def get_tested_vntrs(tested_with_pacbio=False):
+    pacbio_results = []
+    illumina_results = []
+
+    with open('pacbio_trained_new_id.txt') as infile:
+        lines = infile.readlines()
+    pacbio_ids = [int(e.strip()) for e in lines]
+
+    reference_vntrs = load_unique_vntrs_data()
+    for ref_vntr in reference_vntrs:
+        Illumina = True
+        pacbio = True if ref_vntr.id in pacbio_ids or ref_vntr.annotation == 'Coding' else False
+        if ref_vntr.id in [532789, 188871, 301645, 468671, 503431]:
+            pass
+        elif ref_vntr.annotation != 'Coding' or ref_vntr.get_length() > 140:
+            Illumina = False
+
+        if ref_vntr.id in [3056, 25561, 69212, 415277, 519759, 379159, 532789, 70186, 188143, 193369, 193364, 258405,
+                           188871, 301645, 400825, 468671]:
+            pacbio = True
+
+        if pacbio:
+            pacbio_results.append(ref_vntr.id)
+        if Illumina:
+            illumina_results.append(ref_vntr.id)
+
+    if tested_with_pacbio:
+        return pacbio_results
+    else:
+        return illumina_results
+
+
 def genotype(args, genotype_parser):
     if args.alignment_file is None and args.fasta is None:
         print_error(genotype_parser, 'No input specified. Please specify alignment file or fasta file')
@@ -68,6 +100,11 @@ def genotype(args, genotype_parser):
         target_vntrs = [int(vid) for vid in args.vntr_id.split(',')]
     else:
         target_vntrs = illumina_targets
+    if args.pacbio:
+        target_vntrs = get_tested_vntrs(True)
+    else:
+        target_vntrs = get_tested_vntrs(False)
+    print('running for %s VNTRs' % len(target_vntrs))
     genome_analyzier = GenomeAnalyzer(reference_vntrs, target_vntrs, working_directory)
     if args.pacbio:
         if input_is_alignment_file:

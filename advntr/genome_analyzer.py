@@ -22,12 +22,15 @@ class GenomeAnalyzer:
                 self.vntr_finder[ref_vntr.id] = VNTRFinder(ref_vntr)
 
     @staticmethod
-    def print_genotype(vntr_id, copy_numbers):
+    def print_genotype(vntr_id, copy_numbers, num_of_reads, confidence):
         print(vntr_id)
+        result = ''
         if copy_numbers is not None:
-            print('/'.join([str(cn) for cn in sorted(copy_numbers)]))
+            result = '/'.join([str(cn) for cn in sorted(copy_numbers)])
         else:
-            print('None')
+            result = 'None'
+        result += '#%s#%s' % (num_of_reads, confidence)
+        print(result)
 
     @time_usage
     def get_filtered_read_ids(self, read_file, illumina=True):
@@ -43,7 +46,7 @@ class GenomeAnalyzer:
         identity_cutoff = '100'
         if not illumina:
             identity_cutoff = '70'
-        min_keywords = 5 if illumina else 2
+        min_keywords = 10 if illumina else 2
 
         vntr_read_ids = {}
         queries = []
@@ -99,8 +102,8 @@ class GenomeAnalyzer:
 
         for vid in self.target_vntr_ids:
             reads = [read for read in filtered_reads if read.id in vntr_reads_ids[vid]]
-            copy_numbers = self.vntr_finder[vid].find_repeat_count_from_pacbio_alignment_file(alignment_file, reads)
-            self.print_genotype(vid, copy_numbers)
+            copy_numbers, num_of_reads, confidence = self.vntr_finder[vid].find_repeat_count_from_pacbio_alignment_file(alignment_file, reads)
+            self.print_genotype(vid, copy_numbers, num_of_reads, confidence)
 
     def find_repeat_counts_from_pacbio_reads(self, read_file, naive=False):
         filtered_reads, vntr_reads_ids = self.get_vntr_filtered_reads_map(read_file, False)
@@ -120,9 +123,9 @@ class GenomeAnalyzer:
         filtered_reads, vntr_reads_ids = self.get_vntr_filtered_reads_map(unmapped_reads_file)
         for vid in self.target_vntr_ids:
             unmapped_reads = [read for read in filtered_reads if read.id in vntr_reads_ids[vid]]
-            copy_number = self.vntr_finder[vid].find_repeat_count_from_alignment_file(alignment_file, unmapped_reads,
+            copy_number, num_of_reads, confidence = self.vntr_finder[vid].find_repeat_count_from_alignment_file(alignment_file, unmapped_reads,
                                                                                       average_coverage)
-            self.print_genotype(vid, copy_number)
+            self.print_genotype(vid, copy_number, num_of_reads, confidence)
 
     def find_repeat_counts_from_short_reads(self, read_file):
         for vid in self.target_vntr_ids:

@@ -151,7 +151,7 @@ class VNTRFinder:
         if min_score_to_count_read is not None and logp > min_score_to_count_read:
             return True
         matches = get_number_of_matches_in_vpath(vpath)
-        if min_score_to_count_read is None and matches >= 0.9 * read_length and logp > -read_length:
+        if min_score_to_count_read is None and matches >= 0.95 * read_length and logp > -read_length * 0.7:
             return True
         return False
 
@@ -406,12 +406,12 @@ class VNTRFinder:
                 result = key
 
         logging.info('Maximum probability for genotyping: %s' % max_prob)
-        return result
+        return result, len(observed_copy_numbers), max_prob
 
     def get_dominant_copy_numbers_from_spanning_reads(self, spanning_reads):
         if len(spanning_reads) < 1:
             logging.info('There is no spanning read')
-            return None
+            return None, None, None
         max_length = 0
         for read in spanning_reads:
             if len(read) - 100 > max_length:
@@ -605,20 +605,20 @@ class VNTRFinder:
         logging.info('flanking repeats: %s' % flanking_repeats)
         min_valid_flanked = max(covered_repeats) if len(covered_repeats) > 0 else 0
         max_flanking_repeat = [r for r in flanking_repeats if r == max(flanking_repeats) and r >= min_valid_flanked]
-        if len(max_flanking_repeat) < 5:
+        if len(max_flanking_repeat) < 2:
             max_flanking_repeat = []
 
-        exact_genotype = self.find_genotype_based_on_observed_repeats(covered_repeats + max_flanking_repeat)
+        exact_genotype, num_of_reads, confidence = self.find_genotype_based_on_observed_repeats(covered_repeats + max_flanking_repeat)
         if exact_genotype is not None:
             exact_genotype_log = '/'.join([str(cn) for cn in sorted(exact_genotype)])
         else:
             exact_genotype_log = 'None'
         logging.info('RU count lower bounds: %s' % exact_genotype_log)
         if self.reference_vntr.id not in settings.LONG_VNTRS and average_coverage is None:
-            return exact_genotype
+            return exact_genotype, num_of_reads, confidence
 
         pattern_occurrences = sum(flanking_repeats) + sum(covered_repeats)
-        return self.get_ru_count_with_coverage_method(pattern_occurrences, total_counted_vntr_bp, average_coverage)
+        return self.get_ru_count_with_coverage_method(pattern_occurrences, total_counted_vntr_bp, average_coverage), None, None
 
     def find_repeat_count_from_short_reads(self, short_read_files, working_directory='./'):
         """

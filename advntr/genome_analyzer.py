@@ -71,7 +71,7 @@ class GenomeAnalyzer:
                 if vid in counts.keys():
                     blast_ids = set([read_id for read_id, count in counts[vid].items() if count >= min_keywords])
                     from random import random
-                    sampling_rate = min(2000.0 / len(blast_ids), 1)
+                    sampling_rate = min(2000.0 / len(blast_ids), 1) if len(blast_ids) > 0 else 1
                     blast_ids = set([e for e in blast_ids if random() <= sampling_rate])
                 else:
                     blast_ids = []

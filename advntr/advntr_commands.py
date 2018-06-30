@@ -34,6 +34,8 @@ def get_tested_vntrs(tested_with_pacbio=False):
 
     reference_vntrs = load_unique_vntrs_data()
     for ref_vntr in reference_vntrs:
+        if 'N' in ref_vntr.left_flanking_region[-100:] or 'N' in ref_vntr.right_flanking_region[:100]:
+            continue
         Illumina = True
         pacbio = True if ref_vntr.id in pacbio_ids or ref_vntr.annotation == 'Coding' else False
         if ref_vntr.id in [532789, 188871, 301645, 468671, 503431]:
@@ -99,11 +101,10 @@ def genotype(args, genotype_parser):
     if args.vntr_id is not None:
         target_vntrs = [int(vid) for vid in args.vntr_id.split(',')]
     else:
-        target_vntrs = illumina_targets
-    if args.pacbio:
-        target_vntrs = get_tested_vntrs(True)
-    else:
-        target_vntrs = get_tested_vntrs(False)
+        if args.pacbio:
+            target_vntrs = get_tested_vntrs(True)
+        else:
+            target_vntrs = get_tested_vntrs(False)
     print('running for %s VNTRs' % len(target_vntrs))
     genome_analyzier = GenomeAnalyzer(reference_vntrs, target_vntrs, working_directory)
     if args.pacbio:

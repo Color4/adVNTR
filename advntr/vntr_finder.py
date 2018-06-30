@@ -359,7 +359,7 @@ class VNTRFinder:
         if ck != ci and ck != cj:
             return 0.5 * (r_e ** abs(ck-ci) + r_e ** abs(ck-cj))
 
-    def find_genotype_based_on_observed_repeats(self, observed_copy_numbers, haploid=False):
+    def find_genotype_based_on_observed_repeats(self, observed_copy_numbers, haploid=True):
         ru_counts = {}
         for cn in observed_copy_numbers:
             if cn not in ru_counts.keys():
@@ -476,7 +476,7 @@ class VNTRFinder:
             else:
                 copy_numbers = None
         else:
-            copy_numbers = self.get_dominant_copy_numbers_from_spanning_reads(spanning_reads)
+            copy_numbers, _, _ = self.get_dominant_copy_numbers_from_spanning_reads(spanning_reads)
         return copy_numbers
 
     @time_usage

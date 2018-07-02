@@ -472,7 +472,7 @@ class VNTRFinder:
         if naive:
             if len(length_dist):
                 average_length = sum(length_dist) / float(len(length_dist))
-                copy_numbers = [round(average_length / len(self.reference_vntr.pattern))] * 2
+                copy_numbers = [int(round(average_length / len(self.reference_vntr.pattern)))] * 2
             else:
                 copy_numbers = None
         else:

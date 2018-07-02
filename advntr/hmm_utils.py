@@ -247,8 +247,6 @@ def get_suffix_matcher_hmm(pattern):
     model.add_transition(insert_states[last+1], insert_states[last+1], 0.01)
     model.add_transition(insert_states[last+1], unit_end, 0.99)
 
-    # error_move = 0.01
-    # error_move = settings.MAX_ERROR_RATE / 3
     insert_error = settings.MAX_ERROR_RATE * 2 / 5
     delete_error = settings.MAX_ERROR_RATE * 1 / 5
     for i in range(0, len(pattern)):

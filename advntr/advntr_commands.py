@@ -32,9 +32,17 @@ def get_tested_vntrs(tested_with_pacbio=False):
         lines = infile.readlines()
     pacbio_ids = [int(e.strip()) for e in lines]
 
+    eliminate = []
+    with open('similar_vntrs.txt') as infile:
+        lines = infile.readlines()
+        eliminate += [int(r.strip()) for r in lines]
+    eliminate = set(eliminate)
+
     reference_vntrs = load_unique_vntrs_data()
     for ref_vntr in reference_vntrs:
         if 'N' in ref_vntr.left_flanking_region[-100:] or 'N' in ref_vntr.right_flanking_region[:100]:
+            continue
+        if ref_vntr.id in eliminate:
             continue
         Illumina = True
         pacbio = True if ref_vntr.id in pacbio_ids or ref_vntr.annotation == 'Coding' else False

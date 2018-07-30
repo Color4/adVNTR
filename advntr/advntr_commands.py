@@ -6,7 +6,7 @@ from Bio import SeqIO
 
 from advntr.genome_analyzer import GenomeAnalyzer
 from advntr.models import load_unique_vntrs_data, get_largest_id_in_database, save_reference_vntr_to_database
-from advntr.models import delete_vntr_from_database
+from advntr.models import delete_vntr_from_database, create_vntrs_database
 from advntr.reference_vntr import ReferenceVNTR
 from advntr.vntr_finder import VNTRFinder
 from advntr import settings
@@ -106,7 +106,7 @@ def genotype(args, genotype_parser):
         else:
             target_vntrs = get_tested_vntrs(False)
     print('running for %s VNTRs' % len(target_vntrs))
-    genome_analyzier = GenomeAnalyzer(reference_vntrs, target_vntrs, working_directory)
+    genome_analyzier = GenomeAnalyzer(reference_vntrs, target_vntrs, working_directory, is_haploid=args.haploid)
     if args.pacbio:
         if input_is_alignment_file:
             genome_analyzier.find_repeat_counts_from_pacbio_alignment_file(input_file)
@@ -176,6 +176,9 @@ def add_model(args, addmodel_parser):
         name, sequence = fasta.id, str(fasta.seq)
         if name == chromosome:
             chr_sequence = sequence
+
+    if not os.path.exists(settings.TRAINED_MODELS_DB):
+        create_vntrs_database(settings.TRAINED_MODELS_DB)
     vntr_id = get_largest_id_in_database() + 1
     estimated_repeats = (args.end - args.start) / len(args.pattern) + 5
     ref_vntr = ReferenceVNTR(vntr_id, args.pattern, args.start, chromosome, None, None, estimated_repeats, chr_sequence)

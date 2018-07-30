@@ -104,6 +104,18 @@ def identify_homologous_vntrs(vntrs, chromosome=None):
     return vntrs
 
 
+def create_vntrs_database(db_file):
+    db = sqlite3.connect(db_file)
+    cursor = db.cursor()
+    cursor.execute('''
+    CREATE TABLE vntrs(id INTEGER PRIMARY KEY, nonoverlapping TEXT, chromosome TEXT, ref_start INTEGER, gene_name TEXT,
+    annotation TEXT, pattern TEXT, left_flanking TEXT, right_flanking TEXT, repeats TEXT, scaled_score REAL default 0)
+    ''')
+
+    db.commit()
+    db.close()
+
+
 def load_unique_vntrs_data():
     vntrs = []
     db_file = settings.TRAINED_MODELS_DB
@@ -188,7 +200,8 @@ def get_largest_id_in_database():
     cursor.execute('''SELECT MAX(id) FROM vntrs''')
     result = 0
     for row in cursor:
-        result = row[0]
+        if row[0] is not None:
+            result = row[0]
     return result
 
 
@@ -200,63 +213,64 @@ def delete_vntr_from_database(vntr_id):
     db.close()
 
 
-def is_false_vntr_hit(qresult, ref_vntr, position, threshold):
+def is_false_vntr_hit(qresult, ref_vntr):
     for hit in qresult:
         for hsp in hit:
+            if int(hsp.hit_id) == ref_vntr.id:
+                continue
             score = hsp.match_num - hsp.mismatch_num - hsp.hit_gapopen_num
-            if score > 75:
-                if ref_vntr.chromosome == hit.id and abs(position - hsp.hit_start) <= threshold:
-                    continue
-                else:
-                    print('found in ', hit.id, hsp.hit_start)
-                    return True
+            length = len(ref_vntr.pattern) + 60
+            if score / float(length) > 0.75:
+                print(hsp.hit_id, hsp.hit_start)
+                return True
     return False
 
 
-def find_similar_region_for_vntr(sema, reference_vntr, vntr_id, result_list):
+def find_similar_region_for_vntr(sema, reference_vntr, ref_file, result_list):
     from Bio import SearchIO
-    vntr_len = reference_vntr.get_length()
-    searches = list([])
-    searches.append((reference_vntr.pattern, reference_vntr.start_point, vntr_len + 30))
-    searches.append((reference_vntr.left_flanking_region[-100:], reference_vntr.start_point, 30))
-    searches.append((reference_vntr.right_flanking_region[:100], reference_vntr.start_point + vntr_len, 30))
-    ref_file = 'hg19_chromosomes/CombinedHG19_Reference.fa'
-    found = 0
-    for search_index, search in enumerate(searches):
-        qfile = settings.BLAST_TMP_DIR + str(vntr_id) + '_' + str(search_index) + '_query.fasta'
-        with open(qfile, "w") as output_handle:
-            my_rec = SeqRecord.SeqRecord(seq=Seq.Seq(search[0]), id='query', description='')
-            SeqIO.write([my_rec], output_handle, 'fasta')
-        output = 'blat_out/output_%s_%s.psl' % (vntr_id, search_index)
-        command = 'blat -q=dna -oneOff=1 -tileSize=8 -stepSize=3 -minIdentity=75 %s %s %s' % (ref_file, qfile, output)
-        os.system(command)
-        os.system('rm %s' % qfile)
-        try:
-            qresult = SearchIO.read(output, 'blat-psl')
-            if is_false_vntr_hit(qresult, reference_vntr, search[1], search[2]):
-                found += 1
-        except ValueError:
-            pass
-    if found > 1:
-        print('there is similar sequence for %s' % vntr_id)
-        result_list.append(vntr_id)
+    vntr_id = reference_vntr.id
+    q = reference_vntr.left_flanking_region[-30:] + reference_vntr.pattern + reference_vntr.right_flanking_region[:30]
+    search_index = vntr_id
+    qfile = settings.BLAST_TMP_DIR + str(vntr_id) + '_' + str(search_index) + '_query.fasta'
+    with open(qfile, "w") as output_handle:
+        my_rec = SeqRecord.SeqRecord(seq=Seq.Seq(q), id='query', description='')
+        SeqIO.write([my_rec], output_handle, 'fasta')
+    output = 'blat_out/output_%s_%s.psl' % (vntr_id, search_index)
+    command = 'blat -q=dna -oneOff=1 -tileSize=8 -stepSize=3 -minIdentity=75 %s %s %s' % (ref_file, qfile, output)
+    os.system(command)
+    os.system('rm %s' % qfile)
+    try:
+        qresult = SearchIO.read(output, 'blat-psl')
+        if is_false_vntr_hit(qresult, reference_vntr):
+            print('there is similar sequence for %s' % vntr_id)
+            result_list.append(vntr_id)
+    except ValueError:
+        pass
     sema.release()
 
 
 def identify_similar_regions_for_vntrs_using_blat():
     from multiprocessing import Process, Semaphore, Manager
-
     reference_vntrs = load_unique_vntrs_data()
-    sema = Semaphore(24)
+
+    records = []
+    for ref_vntr in reference_vntrs:
+        record = SeqRecord.SeqRecord('')
+        sequence = ref_vntr.left_flanking_region[-30:] + ref_vntr.pattern + ref_vntr.right_flanking_region[:30]
+        record.seq = Seq.Seq(sequence)
+        record.id = str(ref_vntr.id)
+        records.append(record)
+    vntr_structures_file = 'reference_vntr_structures.fa'
+    with open(vntr_structures_file, 'w') as output_handle:
+        SeqIO.write(records, output_handle, 'fasta')
+
+    sema = Semaphore(7)
     manager = Manager()
     result_list = manager.list()
     process_list = []
-    # os.system('cp hg19_chromosomes/CombinedHG19_Reference.fa /tmp/CombinedHG19_Reference.fa')
-    for i in range(len(reference_vntrs)):
-        if not reference_vntrs[i].is_non_overlapping() or reference_vntrs[i].has_homologous_vntr():
-            continue
+    for ref_vntr in reference_vntrs:
         sema.acquire()
-        p = Process(target=find_similar_region_for_vntr, args=(sema, reference_vntrs[i], i, result_list))
+        p = Process(target=find_similar_region_for_vntr, args=(sema, ref_vntr, vntr_structures_file, result_list))
         process_list.append(p)
         p.start()
 
@@ -284,7 +298,7 @@ def extend_flanking_regions_in_processed_vntrs(flanking_size=500, output_file='v
                                             right_flanking_region, comma_separated_segments))
 
 
-def create_vntr_database():
+def fill_vntr_database():
     for chrom in settings.CHROMOSOMES:
         processed_vntrs = 'vntr_data/VNTRs_%s.txt' % chrom
         database_file = 'vntr_data/hg19_VNTRs.db'

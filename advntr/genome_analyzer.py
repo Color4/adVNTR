@@ -11,22 +11,25 @@ from advntr.vntr_finder import VNTRFinder
 
 
 class GenomeAnalyzer:
-    def __init__(self, reference_vntrs, target_vntr_ids, working_directory='./'):
+    def __init__(self, reference_vntrs, target_vntr_ids, working_directory='./', is_haploid=False):
         self.reference_vntrs = reference_vntrs
         self.target_vntr_ids = target_vntr_ids
         self.working_dir = working_directory
+        self.is_haploid = is_haploid
 
         self.vntr_finder = {}
         for ref_vntr in self.reference_vntrs:
             if ref_vntr.id in target_vntr_ids:
-                self.vntr_finder[ref_vntr.id] = VNTRFinder(ref_vntr)
+                self.vntr_finder[ref_vntr.id] = VNTRFinder(ref_vntr, is_haploid=is_haploid)
 
-    @staticmethod
-    def print_genotype(vntr_id, copy_numbers, num_of_reads=None, confidence=None):
+    def print_genotype(self, vntr_id, copy_numbers, num_of_reads=None, confidence=None):
         print(vntr_id)
         result = ''
         if copy_numbers is not None:
-            result = '/'.join([str(cn) for cn in sorted(copy_numbers)])
+            if self.is_haploid:
+                result = copy_numbers[0]
+            else:
+                result = '/'.join([str(cn) for cn in sorted(copy_numbers)])
         else:
             result = 'None'
         if num_of_reads is not None:

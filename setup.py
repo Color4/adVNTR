@@ -2,13 +2,17 @@ from setuptools import setup
 from Cython.Build import cythonize
 import numpy
 
+from advntr import __version__
+
+
 setup(name='advntr',
-      version='1.0.3',
+      version=__version__,
       description='A tool for genotyping Variable Number Tandem Repeats (VNTR) from sequence data',
       author='Mehrdad Bakhtiari',
       author_email='mbakhtia@ucsd.edu',
       license='BSD-3-Clause',
       url='https://github.com/mehrdadbakhtiari/adVNTR',
+      test_suite='tests',
       packages=['advntr', 'pomegranate'],
       package_dir={'advntr': 'advntr', 'advntr.pomegranate': 'pomegranate'},
       install_requires=['networkx==1.11', 'scipy', 'biopython', 'cython', 'scikit-learn'],

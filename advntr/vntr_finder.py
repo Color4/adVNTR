@@ -1,3 +1,4 @@
+from collections import Counter
 import logging
 import numpy
 import os
@@ -33,8 +34,9 @@ class SelectedRead:
 class VNTRFinder:
     """Find the VNTR structure of a reference VNTR in NGS data of the donor."""
 
-    def __init__(self, reference_vntr):
+    def __init__(self, reference_vntr, is_haploid=False):
         self.reference_vntr = reference_vntr
+        self.is_haploid = is_haploid
         self.min_repeat_bp_to_add_read = 2
         if len(self.reference_vntr.pattern) < 30:
             self.min_repeat_bp_to_add_read = 2
@@ -110,36 +112,6 @@ class VNTRFinder:
         if reference_name == self.reference_vntr.chromosome and self.vntr_start - len(read.seq) < read_start < self.vntr_end:
             return True
         return False
-
-    def find_score_distribution_of_ref(self, samfile, reference, hmm, false_scores, true_scores):
-        process_list = []
-        sema = Semaphore(settings.CORES)
-        for read in samfile.fetch(reference, multiple_iterators=True):
-            if read.is_unmapped:
-                continue
-            if read.seq.count('N') > 0:
-                continue
-
-            if self.is_true_read(read):
-                sema.acquire()
-                p = Process(target=VNTRFinder.add_hmm_score_to_list, args=(sema, hmm, read, true_scores))
-            else:
-                if random() > settings.SCORE_FINDING_READS_FRACTION:
-                    continue
-                sema.acquire()
-                p = Process(target=VNTRFinder.add_hmm_score_to_list, args=(sema, hmm, read, false_scores))
-            process_list.append(p)
-            p.start()
-        for p in process_list:
-            p.join()
-
-    def save_scores(self, true_scores, false_scores, alignment_file):
-        with open('true_scores_dist_%s_%s' % (self.reference_vntr.id, os.path.basename(alignment_file)), 'w') as out:
-            for score in true_scores:
-                out.write('%.4f\n' % score)
-        with open('false_scores_dist_%s_%s' % (self.reference_vntr.id, os.path.basename(alignment_file)), 'w') as out:
-            for score in false_scores:
-                out.write('%.4f\n' % score)
 
     def get_min_score_to_select_a_read(self, read_length):
         if self.reference_vntr.scaled_score is None or self.reference_vntr.scaled_score == 0:
@@ -241,7 +213,7 @@ class VNTRFinder:
             return
         min_left, max_left = 10e9, 0
         for aln in left_alignments:
-            if aln[2] < len(left_flanking) * (1 - 0.3):
+            if aln[2] < len(left_flanking) * (1 - settings.MAX_ERROR_RATE):
                 continue
             min_left = min(min_left, aln[3])
             max_left = max(max_left, aln[3])
@@ -257,7 +229,7 @@ class VNTRFinder:
             return
         min_right, max_right = 10e9, 0
         for aln in right_alignments:
-            if aln[2] < len(right_flanking) * (1 - 0.3):
+            if aln[2] < len(right_flanking) * (1 - settings.MAX_ERROR_RATE):
                 continue
             min_right = min(min_right, aln[3])
             max_right = max(max_right, aln[3])
@@ -359,7 +331,7 @@ class VNTRFinder:
         if ck != ci and ck != cj:
             return 0.5 * (r_e ** abs(ck-ci) + r_e ** abs(ck-cj))
 
-    def find_genotype_based_on_observed_repeats(self, observed_copy_numbers, haploid=True):
+    def find_genotype_based_on_observed_repeats(self, observed_copy_numbers):
         ru_counts = {}
         for cn in observed_copy_numbers:
             if cn not in ru_counts.keys():
@@ -383,7 +355,7 @@ class VNTRFinder:
                 for j in range(len(ru_counts)):
                     if j < i:
                         continue
-                    if haploid and i != j:
+                    if self.is_haploid and i != j:
                         continue
                     cj = ru_counts[j][0]
                     if (ci, cj) not in prs.keys():
@@ -454,6 +426,19 @@ class VNTRFinder:
             copy_numbers.append(get_number_of_repeats_in_vpath(vpath))
         return copy_numbers
 
+    def find_ru_counts_with_naive_approach(self, length_dist):
+        if len(length_dist):
+            ru_counts_list = [round(length / len(self.reference_vntr.pattern)) for length in length_dist]
+            ru_count_frequencies = Counter(ru_counts_list)
+            copy_numbers = [ru_count_frequencies[0][0]]
+            if len(ru_count_frequencies.keys()) > 1 and ru_count_frequencies[1][1] > ru_count_frequencies[0][1] / 5:
+                copy_numbers.append(ru_count_frequencies[1][0])
+            else:
+                copy_numbers = copy_numbers * 2
+        else:
+            copy_numbers = None
+        return copy_numbers
+
     @time_usage
     def find_repeat_count_from_pacbio_alignment_file(self, alignment_file, unmapped_filtered_reads):
         logging.debug('finding repeat count from pacbio alignment file for %s' % self.reference_vntr.id)
@@ -470,11 +455,7 @@ class VNTRFinder:
         logging.debug('finding repeat count from pacbio reads file for %s' % self.reference_vntr.id)
         spanning_reads, length_dist = self.get_spanning_reads_of_unaligned_pacbio_reads(unmapped_filtered_reads)
         if naive:
-            if len(length_dist):
-                average_length = sum(length_dist) / float(len(length_dist))
-                copy_numbers = [round(average_length / len(self.reference_vntr.pattern))] * 2
-            else:
-                copy_numbers = None
+            copy_numbers = self.find_ru_counts_with_naive_approach(length_dist)
         else:
             copy_numbers, _, _ = self.get_dominant_copy_numbers_from_spanning_reads(spanning_reads)
         return copy_numbers
@@ -563,7 +544,9 @@ class VNTRFinder:
 
     @time_usage
     def get_ru_count_with_coverage_method(self, pattern_occurrences, total_counted_vntr_bp, average_coverage):
-        return [int(pattern_occurrences / (average_coverage * 2.0))] * 2
+        haplotypes = 1 if self.is_haploid else 2
+        estimate = [int(pattern_occurrences / (float(average_coverage) * haplotypes))] * 2
+        return estimate
         pattern_occurrences = total_counted_vntr_bp / float(len(self.reference_vntr.pattern))
         read_mode = 'r' if alignment_file.endswith('sam') else 'rb'
         samfile = pysam.AlignmentFile(alignment_file, read_mode)

@@ -5,6 +5,7 @@ import argparse
 
 from advntr.advntr_commands import genotype, view_model, add_model, del_model
 from advntr import settings
+from advntr import __version__
 
 
 class CustomHelpFormatter(argparse.HelpFormatter):
@@ -19,11 +20,11 @@ class CustomHelpFormatter(argparse.HelpFormatter):
 
 def main():
     description = '=======================================================\n' \
-                  'adVNTR 1.0.0: Genopyting tool for VNTRs\n' \
+                  'adVNTR %s: Genopyting tool for VNTRs\n' \
                   '=======================================================\n' \
                   'Source code: https://github.com/mehrdadbakhtiari/adVNTR\n' \
                   'Instructions: http://advntr.readthedocs.io\n' \
-                  '-------------------------------------------------------\n'
+                  '-------------------------------------------------------\n' % __version__
     help = 'Command: genotype\tfind RU counts and mutations in VNTRs\n' \
            '         viewmodel\tview existing models in database\n' \
            '         addmodel\tadd custom VNTR to the database\n' \
@@ -54,6 +55,8 @@ def main():
                                           help='set this flag to determine long expansion from PCR-free data')
     genotype_algortihm_group.add_argument('-c', '--coverage', type=float, metavar='<float>',
                                           help='average sequencing coverage in PCR-free sequencing')
+    genotype_algortihm_group.add_argument('--haploid', action='store_true', default=False,
+                                          help='set this flag if the organism is haploid')
     genotype_algortihm_group.add_argument('-naive', '--naive', action='store_true', default=False,
                                           help='use naive approach for PacBio reads')
 

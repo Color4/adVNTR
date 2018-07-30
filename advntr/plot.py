@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 
 def plot1():
     stat_files = ['0_size_related_reads.txt', '1_size_sensitivity.txt', '2_size_blast_selected.txt',
@@ -508,10 +509,11 @@ def plot_indel_frequencies_for_diabetes():
 
 def add_recruitment_results_for_illumina(illumina_recruitment_plots, results_dir):
     import glob
-    titles = 'DEF'
+    titles = 'ABC'
+    ru = [12, 30, 39]
 
     arrow_heads = [(3, 1), (4, 1), (4, 1)]
-    arrow_tails = [(50, -90), (+10, -65), (+10, -65)]
+    arrow_tails = [(50, -110), (+10, -65), (+10, -65)]
     gene_dirs = glob.glob(results_dir + '*')
     gene_index = 0
     for gene_dir in gene_dirs:
@@ -533,7 +535,8 @@ def add_recruitment_results_for_illumina(illumina_recruitment_plots, results_dir
                 bwa_result.append(float(bwa) / original)
                 bowtie_result.append(float(bowtie) / original)
                 #'o-',markersize=4.2,
-        illumina_recruitment_plots[gene_index].title.set_text(titles[gene_index] + ') %s' % gene_name)
+        title_text = '('+titles[gene_index] + ') %s' % gene_name + ' \t(RU=%sbp)' % ru[gene_index]
+        illumina_recruitment_plots[gene_index].set_title(title_text, fontsize=13)
         illumina_recruitment_plots[gene_index].plot(copies, our_selection_result, '.-', markersize=4, label='adVNTR')
         illumina_recruitment_plots[gene_index].plot(copies, bwa_result, '.-', markersize=4, label='BWA-MEM')
         illumina_recruitment_plots[gene_index].plot(copies, bowtie_result, '.-', markersize=4,  label='Bowtie2', color='orange')
@@ -594,14 +597,14 @@ def plot_read_recruitment_results():
     plt.gca().spines['bottom'].set_color('black')
     plt.gca().spines['left'].set_color('black')
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=(9, 3))
     ax = list([])
     x_label_font = 13
     y_label_font = 13
 
     ax.append(fig.add_subplot(111))
-    ax[0].set_ylabel(r'\emph{Read Selection Recall}', fontsize=y_label_font)
-    ax[0].set_xlabel(r'\emph{Simulated RU Count}', fontsize=x_label_font)
+    ax[0].set_ylabel(r'\emph{Read Selection Recall}', fontsize=y_label_font, labelpad=10)
+    ax[0].set_xlabel(r'\emph{Simulated RU Count}', fontsize=x_label_font, labelpad=10)
 
     # Turn off axis lines and ticks of the big subplot
     for i in range(1):
@@ -612,25 +615,26 @@ def plot_read_recruitment_results():
         ax[i].tick_params(labelcolor='w', top='off', bottom='off', left='off', right='off')
 
 
-    pacbio_recruitment_plots = list([])
-    pacbio_recruitment_plots.append(fig.add_subplot(231))
-    pacbio_recruitment_plots.append(fig.add_subplot(232, sharey=pacbio_recruitment_plots[0]))
-    pacbio_recruitment_plots.append(fig.add_subplot(233, sharey=pacbio_recruitment_plots[0]))
-    add_recruitment_results_for_pacbio(pacbio_recruitment_plots, results_dir='../pacbio_coverage_experiment/')
+    # pacbio_recruitment_plots = list([])
+    # pacbio_recruitment_plots.append(fig.add_subplot(231))
+    # pacbio_recruitment_plots.append(fig.add_subplot(232, sharey=pacbio_recruitment_plots[0]))
+    # pacbio_recruitment_plots.append(fig.add_subplot(233, sharey=pacbio_recruitment_plots[0]))
+    # add_recruitment_results_for_pacbio(pacbio_recruitment_plots, results_dir='../pacbio_coverage_experiment/')
 
     illumina_recruitment_plots = list([])
-    illumina_recruitment_plots.append(fig.add_subplot(234))
-    illumina_recruitment_plots.append(fig.add_subplot(235))
-    illumina_recruitment_plots.append(fig.add_subplot(236))
+    illumina_recruitment_plots.append(fig.add_subplot(131))
+    illumina_recruitment_plots.append(fig.add_subplot(132))
+    illumina_recruitment_plots.append(fig.add_subplot(133))
     add_recruitment_results_for_illumina(illumina_recruitment_plots, results_dir='../Illumina_copy_number_short_vntrs_mapping/')
 
     plt.tight_layout(pad=0.6, w_pad=0.5, h_pad=1.0)
     # plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.3, hspace=0.4)
-    plt.subplots_adjust(top=0.85, left=0.1, bottom=0.1)
+    plt.subplots_adjust(top=0.80, left=0.1, bottom=0.1)
 
     illumina_handles, illumina_labels = illumina_recruitment_plots[2].get_legend_handles_labels()
-    handles, labels = pacbio_recruitment_plots[2].get_legend_handles_labels()
-    plt.figlegend(handles + illumina_handles[1:], labels + illumina_labels[1:], loc='upper center', ncol=5, labelspacing=0.)
+    # handles, labels = pacbio_recruitment_plots[2].get_legend_handles_labels()
+    # plt.figlegend(handles + illumina_handles[1:], labels + illumina_labels[1:], loc='upper center', ncol=5, labelspacing=0.)
+    plt.figlegend(illumina_handles, illumina_labels, loc='upper center', ncol=5, labelspacing=0.)
     # fig.legend(lines, labels, loc=(0.5, 0), ncol=5)
 
     plt.savefig('read_recruitment_result.pdf', bbox_inches='tight')
@@ -671,71 +675,106 @@ def get_correct_estimates_for_ru(files, ru_length=None, adVNTR=False):
 def plot_pacbio_ru_length_result(results_dir='../pacbio_ru_data_for_all_vntrs/'):
     from matplotlib import rc, rcParams
     import matplotlib.pyplot as plt
+    import numpy as np
     fig = plt.figure()
     plt.style.use('ggplot')
     plt.rcParams['axes.facecolor'] = '#FFFFFF'
     rc('text', usetex=True)
+    rcParams['text.latex.unicode'] = True
     rcParams['text.latex.preamble'] = [r'\usepackage{sfmath} \boldmath']
-    plt.title('Effect of RU Length on RU Count Estimation')
+    plt.title(r'Effect of RU Length on RU Count Estimation', fontname='Sans')
     plt.ylabel(r'\emph{Correct Estimates Percentage}')
     plt.xlabel(r'\emph{RU Length}')
     ax = fig.add_subplot(1, 1, 1)
     plt.gca().spines['bottom'].set_color('black')
     plt.gca().spines['left'].set_color('black')
-    ax.text(-0.1, 1.1, r'\textbf{B}', transform=ax.transAxes,
-          fontsize=16, fontweight='bold', va='top', ha='right')
+    # ax.text(-0.1, 1.1, r'\textbf{B}', transform=ax.transAxes, fontsize=16, fontweight='bold', va='top', ha='right')
     import glob
+    import os
     ru_dirs = glob.glob(results_dir + '*')
     points = []
     naive_points = []
+
+    def get_lengths_and_discrepancies(file_name):
+        import ast
+        with open(file_name) as infile:
+            lines = infile.readlines()
+            if len(lines) < 2:
+                return [], []
+            length = ast.literal_eval(lines[0])
+            disc = ast.literal_eval(lines[-1])
+        return length, disc
+
+    lengths = []
+    naive_lengths = []
+    discrepancies = []
+    naive_discrepancies = []
     for ru_dir in ru_dirs:
-        ru_length = int(ru_dir.split('/')[-1])
-        files = glob.glob(ru_dir + '/*.fasta.out')
-        naivefiles = glob.glob(ru_dir + '/*.fasta.out.naive')
-        corrects, error_bar = get_correct_estimates_for_ru(files, ru_length, True)
-        naive_corrects, naive_error_bar = get_correct_estimates_for_ru(naivefiles, ru_length)
-        points.append((ru_length, corrects, error_bar))
-        naive_points.append((ru_length, naive_corrects, naive_error_bar))
-    points = sorted(points)
-    ru_lengths = [x for x, y, z in points]
-    naive_points = sorted(naive_points)
+        vntr_id = os.path.basename(ru_dir)
+        if not os.path.exists(ru_dir + '/advntr_result.txt') or not os.path.exists(ru_dir + '/naive_result.txt'):
+            continue
+        length, disc = get_lengths_and_discrepancies(ru_dir + '/advntr_result.txt')
+        naive_length, naive_disc = get_lengths_and_discrepancies(ru_dir + '/naive_result.txt')
+        lengths += length
+        naive_lengths += naive_length
+        discrepancies += disc
+        naive_discrepancies += naive_disc
 
-    ru_lengths = [int(x/10)*10 for x, y, z in points]
-    corrects = []
-    naive_corrects = []
-    for x in ru_lengths:
+    print(len(discrepancies))
+
+    def plot_data(matplot_ax, discrepancies_list, lengths_list, naive=0):
+        data = {}
+        width = 200
+        offset = float(width) / 2
+        if naive:
+            offset *= -1
+
         total = 0
-        num = 0
-        for xx, yy, zz in points:
-            if (xx/10)*10 == x:
-                total += yy
-                num += 1
-        corrects.append(float(total)/num)
-    naive_error_bars = []
-    from scipy import stats
-    for x in ru_lengths:
-        total = 0.0
-        num = 0.0
-        observed_values = []
-        for xx, yy, zz in naive_points:
-            if (xx/10)*10 == x:
-                observed_values.append(yy)
-                total += yy
-                num += 1
-        naive_corrects.append(float(total)/num)
-        naive_error_bars.append(stats.sem(observed_values))
+        total_wrongs = 0
+        for i in range(len(discrepancies_list)):
+            key = 500 * (lengths_list[i] / 500)
+            if key > 3000:
+                continue
+            if key not in data.keys():
+                data[key] = []
+            data[key].append(discrepancies_list[i])
+        for key in data.keys():
+            wrongs = sum([1 for e in data[key] if e > 0])
+            total_wrongs += wrongs
+            total += len(data[key])
+            data[key] = 100 - 100 * wrongs / float(len(data[key]))
+        print(total_wrongs, total)
+        print('accuracy:', 100-float(total_wrongs) / total * 100)
+        print(data)
+        label = r'Naïve Method'.decode('utf-8') if naive else 'adVNTR'
+        matplot_ax.bar(np.array(data.keys()) + offset, data.values(), width=width, label=label)
+        matplot_ax.set_xticks(data.keys())
+        matplot_ax.set_xticklabels([r'\textbf{%s-%s}' % (e, e+500) for e in data.keys()])
 
-    print(naive_error_bars)
-    error_bars = [0 for x, y, z in points]
-    # naive_error_bars = [0 for x, y, z in naive_points]
-    # corrects = [y for x, y, z in points]
-    # naive_corrects = [y for x, y, z in naive_points]
-    plt.errorbar(ru_lengths, corrects, yerr=error_bars, label='adVNTR')
-    plt.errorbar(ru_lengths, naive_corrects, yerr=naive_error_bars, ls='--', label='Naive Method')
+    plot_data(ax, discrepancies, lengths, 0)
+    plot_data(ax, naive_discrepancies, naive_lengths, 1)
+    ax.set_ylim((0, 100))
+    ax.set_xlabel(r'\emph{VNTR Length}', fontsize=13, labelpad=8)
+    ax.set_ylabel(r'\emph{Correct Estimate Percentage}', fontsize=13)
+    plt.xticks(fontsize=8)#, rotation=45)
 
-    plt.tight_layout(pad=2, w_pad=0.5, h_pad=1)
+    # naive_error_bars = []
+    # from scipy import stats
+    # for x in ru_lengths:
+    #     total = 0.0
+    #     num = 0.0
+    #     observed_values = []
+    #     for xx, yy, zz in naive_points:
+    #         if (xx/10)*10 == x:
+    #             observed_values.append(yy)
+    #             total += yy
+    #             num += 1
+    #     naive_corrects.append(float(total)/num)
+    #     naive_error_bars.append(stats.sem(observed_values))
 
-    plt.legend(loc=4, fontsize=16)
+    # plt.tight_layout(pad=2, w_pad=0.5, h_pad=1)
+
+    plt.legend(loc=3, fontsize=16)
     plt.savefig('pacbio_ru_length_results.pdf')
 
 
@@ -1249,7 +1288,7 @@ for a, b in edges:
 # plot_read_recruitment_results()
 # plot_inconsistency_difference()
 
-# plot_pacbio_ru_length_result()
+plot_pacbio_ru_length_result('../pacbio_simulations/')
 # plot_pedigree_tree()
 # plot_lr_pcr()
 
